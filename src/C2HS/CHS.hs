@@ -55,8 +55,8 @@
 --            | `alignof' ident
 --            | `enum' idalias trans [`nocode'] [`with' prefix] [`add' prefix] [deriving]
 --            | `enum` `define` idalias [deriving]
---            | `call' [`pure'] [`unsafe'] idalias
---            | `fun' [`pure'] [`unsafe'] idalias parms
+--            | `call' [`pure'] [`unsafe'|`interruptible'] idalias
+--            | `fun' [`pure'] [`unsafe'|`interruptible'] idalias parms
 --            | `get' [`struct'] apath
 --            | `set' [`struct'] apath
 --            | `offsetof` apath
@@ -110,6 +110,7 @@ where
 -- standard libraries
 import Data.Char (isSpace, toUpper, toLower)
 import Data.List (intersperse)
+import Data.Maybe (fromMaybe)
 import Control.Monad (when)
 import System.FilePath ((<.>), (</>))
 
@@ -120,6 +121,7 @@ import Language.C.Data.Position
 import Data.Errors       (interr)
 
 -- C->Haskell
+import C2HS.Types
 import C2HS.State (CST, getSwitch, chiPathSB, catchExc, throwExc, raiseError,
                   fatal, errorsPresent, showErrors, Traces(..), putTraceStr)
 import qualified System.CIO as CIO
@@ -222,12 +224,12 @@ data CHSHook = CHSImport  Bool                  -- qualified?
                           [Ident]               -- instance requests from user
                           Position
              | CHSCall    Bool                  -- is a pure function?
-                          Bool                  -- is unsafe?
+                          (Maybe ForeignModifier) -- is unsafe/interruptible or default?
                           CHSAPath              -- C function
                           (Maybe Ident)         -- Haskell name
                           Position
              | CHSFun     Bool                  -- is a pure function?
-                          Bool                  -- is unsafe?
+                          (Maybe ForeignModifier) -- is unsafe/interruptible or default?
                           Bool                  -- is variadic?
                           [String]              -- variadic C parameter types
                           CHSAPath              -- C function
@@ -598,15 +600,15 @@ showCHSHook (CHSEnumDefine ide trans derive _) =
       " deriving ("
       ++ concat (intersperse ", " (map identToString derive))
       ++ ") "
-showCHSHook (CHSCall isPure isUns ide oalias _) =
+showCHSHook (CHSCall isPure mMod ide oalias _) =
     showString "call "
   . (if isPure then showString "pure " else id)
-  . (if isUns then showString "unsafe " else id)
+  . (fromMaybe id $ showString . showForeignModifier' <$> mMod)
   . showApAlias ide oalias
-showCHSHook (CHSFun isPure isUns isVar varTypes ide oalias octxt parms parm _) =
+showCHSHook (CHSFun isPure mMod isVar varTypes ide oalias octxt parms parm _) =
     showString "fun "
   . (if isPure then showString "pure " else id)
-  . (if isUns then showString "unsafe " else id)
+  . (fromMaybe id $ showString . showForeignModifier' <$> mMod)
   . (if isVar then showString "variadic " else id)
   . showFunAlias ide varTypes oalias
   . (case octxt of
@@ -1137,20 +1139,20 @@ parseCall          :: Position -> Position -> [CHSToken] -> CST s [CHSFrag]
 parseCall hkpos pos toks  =
   do
     (isPure  , toks'   ) <- parseIsPure          toks
-    (isUnsafe, toks''  ) <- parseIsUnsafe        toks'
+    (mMod    , toks''  ) <- parseModifier        toks'
     (apath   , toks''' ) <- parsePath            toks''
     (oalias  , toks'''') <- parseOptAs (apathToIdent apath) False toks'''
     toks'''''            <- parseEndHook         toks''''
     frags                <- parseFrags           toks'''''
     return $
-      CHSHook (CHSCall isPure isUnsafe apath oalias pos) hkpos : frags
+      CHSHook (CHSCall isPure mMod apath oalias pos) hkpos : frags
 
 parseFun          :: Position -> Position -> [CHSToken] -> CST s [CHSFrag]
 parseFun hkpos pos inputToks  =
   do
     (isPure  , toks' ) <- parseIsPure          toks
-    (isUnsafe, toks'2) <- parseIsUnsafe        toks'
-    (isVar,    toks'3) <- parseIsVariadic      toks'2
+    (mMod    , toks'2) <- parseModifier        toks'
+    (isVar   , toks'3) <- parseIsVariadic      toks'2
     (apath   , toks'4) <- parsePath            toks'3
     (varTypes, toks'5) <- parseVarTypes        toks'4
     (oalias  , toks'6) <- parseOptAs (apathToIdent apath) False toks'5
@@ -1162,7 +1164,7 @@ parseFun hkpos pos inputToks  =
     frags              <- parseFrags           toks'10
     return $
       CHSHook
-        (CHSFun isPure isUnsafe isVar varTypes
+        (CHSFun isPure mMod isVar varTypes
          apath oalias octxt parms parm pos) hkpos :
       frags
   where
@@ -1225,9 +1227,10 @@ parseIsPure (CHSTokFun  _:toks) = return (True , toks)  -- backwards compat.
 parseIsPure toks                = return (False, toks)
 -- FIXME: eventually, remove `fun'; it's currently deprecated
 
-parseIsUnsafe :: [CHSToken] -> CST s (Bool, [CHSToken])
-parseIsUnsafe (CHSTokUnsafe _:toks) = return (True , toks)
-parseIsUnsafe toks                  = return (False, toks)
+parseModifier :: [CHSToken] -> CST s (Maybe ForeignModifier, [CHSToken])
+parseModifier (CHSTokUnsafe _:toks) = return (Just Unsafe , toks)
+parseModifier (CHSTokIntrpt _:toks) = return (Just Interruptible , toks)
+parseModifier toks                  = return (Nothing, toks)
 
 parseIsVariadic :: [CHSToken] -> CST s (Bool, [CHSToken])
 parseIsVariadic (CHSTokVariadic _:toks) = return (True , toks)

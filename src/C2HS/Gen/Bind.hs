@@ -146,6 +146,7 @@ import C2HS.Switches   (platformSB)
 
 
 -- C->Haskell
+import C2HS.Types
 import C2HS.State  (CST, errorsPresent, showErrors, fatal,
                    SwitchBoard(..), Traces(..), putTraceStr)
 import C2HS.C
@@ -653,7 +654,7 @@ expandHook (CHSEnum cide oalias chsTrans emit oprefix orepprefix derive pos) _ =
     let trans = transTabToTransFun pfx reppfx chsTrans
         hide  = identToString . fromMaybe cide $ oalias
     enumDef enum hide trans emit (map identToString derive) pos
-expandHook hook@(CHSCall isPure isUns (CHSRoot _ ide) oalias pos) _ =
+expandHook hook@(CHSCall isPure mMod (CHSRoot _ ide) oalias pos) _ =
   do
     traceEnter
     -- get the corresponding C declaration; raises error if not found or not a
@@ -666,7 +667,7 @@ expandHook hook@(CHSCall isPure isUns (CHSRoot _ ide) oalias pos) _ =
         cdecl'    = ide' `simplifyDecl` cdecl
     ty <- extractFunType pos cdecl' Nothing
     let args      = concat [ " x" ++ show n | n <- [1..numArgs ty] ]
-    callImport hook isUns [] ideLexeme hsLexeme cdecl' Nothing pos
+    callImport hook mMod [] ideLexeme hsLexeme cdecl' Nothing pos
     when isPure $ addHsDependency "System.IO.Unsafe"
     case (isPure, length args) of
       (False, _) -> return hsLexeme
@@ -678,7 +679,7 @@ expandHook hook@(CHSCall isPure isUns (CHSRoot _ ide) oalias pos) _ =
   where
     traceEnter = traceGenBind $
       "** Call hook for `" ++ identToString ide ++ "':\n"
-expandHook hook@(CHSCall isPure isUns apath oalias pos) _ =
+expandHook hook@(CHSCall isPure mMod apath oalias pos) _ =
   do
     traceEnter
 
@@ -701,7 +702,7 @@ expandHook hook@(CHSCall isPure isUns apath oalias pos) _ =
         -- cdecl'    = ide `simplifyDecl` cdecl
         args      = concat [ " x" ++ show n | n <- [1..numArgs ty] ]
 
-    callImportDyn hook isUns ideLexeme hsLexeme decl ty pos
+    callImportDyn hook mMod ideLexeme hsLexeme decl ty pos
     let res = "(\\o" ++ args ++ " -> " ++ set_get ++ " o >>= \\f -> "
               ++ hsLexeme ++ " f" ++ args ++ ")"
     if isPure
@@ -715,7 +716,7 @@ expandHook hook@(CHSCall isPure isUns apath oalias pos) _ =
       identToString (apathToIdent apath) ++ "':\n"
     traceValueType et  = traceGenBind $
       "Type of accessed value: " ++ showExtType et ++ "\n"
-expandHook (CHSFun isPure isUns _ inVarTypes (CHSRoot _ ide)
+expandHook (CHSFun isPure mMod _ inVarTypes (CHSRoot _ ide)
             oalias ctxt parms parm pos) hkpos =
   do
     traceEnter
@@ -731,7 +732,7 @@ expandHook (CHSFun isPure isUns _ inVarTypes (CHSRoot _ ide)
         fiLexeme  = hsLexeme ++ "'_"   -- Urgh - probably unqiue...
         fiIde     = internalIdent fiLexeme
         cdecl'    = cide `simplifyDecl` cdecl
-        callHook  = CHSCall isPure isUns (CHSRoot False cide) (Just fiIde) pos
+        callHook  = CHSCall isPure mMod (CHSRoot False cide) (Just fiIde) pos
         isWrapped (CHSParm _ _ twovals _ w _ _)
           | twovals = [w, w]
           | otherwise = [w]
@@ -739,7 +740,7 @@ expandHook (CHSFun isPure isUns _ inVarTypes (CHSRoot _ ide)
         wrapped   = Just $ concatMap isWrapped parms
 
     varTypes <- convertVarTypes hsLexeme pos inVarTypes
-    callImport callHook isUns varTypes (identToString cide)
+    callImport callHook mMod varTypes (identToString cide)
       fiLexeme cdecl' wrapped pos
 
     extTy <- extractFunType pos cdecl' wrapped
@@ -748,7 +749,7 @@ expandHook (CHSFun isPure isUns _ inVarTypes (CHSRoot _ ide)
   where
     traceEnter = traceGenBind $
       "** Fun hook for `" ++ identToString ide ++ "':\n"
-expandHook (CHSFun isPure isUns _ _ apath oalias ctxt parms parm pos) hkpos =
+expandHook (CHSFun isPure mMod _ _ apath oalias ctxt parms parm pos) hkpos =
   do
     traceEnter
 
@@ -771,8 +772,8 @@ expandHook (CHSFun isPure isUns _ _ apath oalias ctxt parms parm pos) hkpos =
         fiIde     = internalIdent fiLexeme
         -- cdecl'    = cide `simplifyDecl` cdecl
         -- args      = concat [ " x" ++ show n | n <- [1..numArgs ty] ]
-        callHook  = CHSCall isPure isUns apath (Just fiIde) pos
-    callImportDyn callHook isUns ideLexeme fiLexeme decl ty pos
+        callHook  = CHSCall isPure mMod apath (Just fiIde) pos
+    callImportDyn callHook mMod ideLexeme fiLexeme decl ty pos
 
     set_get <- setGet pos CHSGet offsets Nothing ptrTy Nothing
     funDef isPure hsLexeme fiLexeme (FunET ptrTy $ purify ty) []
@@ -1127,9 +1128,9 @@ enumInst ident list' = intercalate "\n"
 -- * the C declaration is a simplified declaration of the function that we
 --   want to import into Haskell land
 --
-callImport :: CHSHook -> Bool -> [ExtType] -> String ->
+callImport :: CHSHook -> Maybe ForeignModifier -> [ExtType] -> String ->
               String -> CDecl -> Maybe [Bool] -> Position -> GB ()
-callImport hook isUns varTypes ideLexeme hsLexeme cdecl owrapped pos =
+callImport hook mMod varTypes ideLexeme hsLexeme cdecl owrapped pos =
   do
     -- compute the external type from the declaration, and delay the foreign
     -- export declaration
@@ -1148,7 +1149,7 @@ callImport hook isUns varTypes ideLexeme hsLexeme cdecl owrapped pos =
               else ideLexeme
     addExtTypeDependency extType
     delayCode hook (foreignImport (extractCallingConvention cdecl)
-                    header ide hsLexeme isUns extType varTypes)
+                    header ide hsLexeme mMod extType varTypes)
     when (needwrapper1 || needwrapper2) $
       addWrapper ide ideLexeme cdecl wraps bools pos
     traceFunType extType
@@ -1156,9 +1157,9 @@ callImport hook isUns varTypes ideLexeme hsLexeme cdecl owrapped pos =
     traceFunType et = traceGenBind $
       "Imported function type: " ++ showExtType et ++ "\n"
 
-callImportDyn :: CHSHook -> Bool -> String -> String -> CDecl -> ExtType
-              -> Position -> GB ()
-callImportDyn hook isUns ideLexeme hsLexeme cdecl ty pos =
+callImportDyn :: CHSHook -> Maybe ForeignModifier -> String -> String -> CDecl
+              -> ExtType -> Position -> GB ()
+callImportDyn hook mMod ideLexeme hsLexeme cdecl ty pos =
   do
     -- compute the external type from the declaration, and delay the foreign
     -- export declaration
@@ -1166,7 +1167,7 @@ callImportDyn hook isUns ideLexeme hsLexeme cdecl ty pos =
     when (isVariadic ty) (variadicErr pos (posOf cdecl))
     addExtTypeDependency ty
     delayCode hook (foreignImportDyn (extractCallingConvention cdecl)
-                    ideLexeme hsLexeme isUns ty)
+                    ideLexeme hsLexeme mMod ty)
     traceFunType ty
   where
     traceFunType et = traceGenBind $
@@ -1174,29 +1175,26 @@ callImportDyn hook isUns ideLexeme hsLexeme cdecl ty pos =
 
 -- | Haskell code for the foreign import declaration needed by a call hook
 --
-foreignImport :: CallingConvention -> String -> String -> String -> Bool ->
-                 ExtType -> [ExtType] -> String
-foreignImport cconv header ident hsIdent isUnsafe ty vas =
-  "foreign import " ++ showCallingConvention cconv ++ " " ++ safety
-  ++ " " ++ show entity ++
+foreignImport :: CallingConvention -> String -> String -> String
+              -> Maybe ForeignModifier -> ExtType -> [ExtType] -> String
+foreignImport cconv header ident hsIdent mMod ty vas =
+  "foreign import " ++ showCallingConvention cconv ++ " "
+  ++ showForeignModifier mMod ++ " " ++ show entity ++
   "\n  " ++ hsIdent ++ " :: " ++ showExtFunType ty vas ++ "\n"
   where
-    safety = if isUnsafe then "unsafe" else "safe"
     entity | null header = ident
            | otherwise   = header ++ " " ++ ident
 
 -- | Haskell code for the foreign import dynamic declaration needed by
 -- a call hook
 --
-foreignImportDyn :: CallingConvention -> String -> String -> Bool ->
-                    ExtType -> String
-foreignImportDyn cconv _ident hsIdent isUnsafe ty  =
-  "foreign import " ++ showCallingConvention cconv ++ " " ++ safety
-    ++ " \"dynamic\"\n  " ++
+foreignImportDyn :: CallingConvention -> String -> String ->
+                 Maybe ForeignModifier -> ExtType -> String
+foreignImportDyn cconv _ident hsIdent mMod ty  =
+  "foreign import " ++ showCallingConvention cconv ++ " "
+    ++ showForeignModifier mMod ++ " \"dynamic\"\n  " ++
     hsIdent ++ " :: " ++ impm "FunPtr" ++ "( " ++
     showExtType ty ++ " ) -> " ++ showExtType ty ++ "\n"
-  where
-    safety = if isUnsafe then "unsafe" else "safe"
 
 -- | produce a Haskell function definition for a fun hook
 --
@@ -3097,7 +3095,7 @@ cCompiler = unsafePerformIO $ do
           let mungedCc = mungePath topDir cc
           writeIORef cCompilerRef $ Just mungedCc
           return mungedCc
-        _ -> error "Failed to determine C compiler from 'ghc --info'!" 
+        _ -> error "Failed to determine C compiler from 'ghc --info'!"
 
   where
     -- adapted from ghc/compiler/main/Packages.hs

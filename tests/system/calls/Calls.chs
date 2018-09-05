@@ -1,4 +1,5 @@
 -- -*-haskell-*-
+{-# LANGUAGE InterruptibleFFI #-}
 
 module Main where
 
@@ -26,12 +27,14 @@ main  = do
   {#call printString#} {# call pure  MyString as myString #}
   -- test typedef'ed args without argument variable in prototype
   {#call printString2#} {# call pure MyString as myString #}
+  -- test for interruptible
+  {#call interruptible printString2 as printInterruptible #} {# call pure MyString as myString #}
 
 {#fun foo as fooFun {} -> `Int'#}
 
 {#fun pure bar as barFun {`Int'} -> `Float'#}
 
-{#fun baz as bazFun {`Int', `Float'} -> `()'#}
+{#fun interruptible baz as bazFun {`Int', `Float'} -> `()'#}
 
 {#fun pure MyString as myStringFun {} -> `String'#}
 

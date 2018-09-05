@@ -202,7 +202,7 @@ c2hs --cppopts='-I/some/obscure/dir' --cppopts=-DEXTRA' <replaceable>Lib</replac
     it is best to use multiple <literal>--cppopts=</literal> flags. That way
     there is no need to worry about quoting.
     </para>
-    
+
     <para>
     Often, <replaceable>lib</replaceable><literal>.h</literal> will not be in
     the current directory, but in one of the header file directories. &c2hs;
@@ -226,7 +226,7 @@ c2hs --cppopts='-I/some/obscure/dir' --cppopts=-DEXTRA' <replaceable>Lib</replac
     are searched first.
     </para>
   </sect2>
-  
+
   <sect2>
     <title>Compilation of a Generated Haskell API</title>
     <para>
@@ -275,7 +275,7 @@ c2hs --cppopts='-I/some/obscure/dir' --cppopts=-DEXTRA' <replaceable>Lib</replac
     <para>
     If an explicit output file name is given (<literal>--output</literal>
     option), this name determines the basename for the <literal>.chi</literal>
-    file of the currently translated module. 
+    file of the currently translated module.
     </para>
     <para>
     Currently, only pointer hooks generate information that is stored in a
@@ -315,7 +315,7 @@ c2hs --cppopts='-I/some/obscure/dir' --cppopts=-DEXTRA' <replaceable>Lib</replac
         <para><replaceable>prefix</replaceable> is an identifier prefix that
         may be omitted in the lexemes of identifiers referring to C definitions
         in any binding hook.  The is useful as C libraries often use a prefix,
-        such as <literal>gtk_</literal>, as a form of poor man's name spaces. 
+        such as <literal>gtk_</literal>, as a form of poor man's name spaces.
         Any occurrence of underline characters between a prefix and the main
         part of an identifier must also be dropped.  Case is not relevant in a
         prefix.  In case of a conflict of the abbreviation with an explicitly
@@ -370,7 +370,7 @@ gIntSize  = {#sizeof gint#}
 
     The type must be a defined type, primitive types, such as
     <literal>int</literal>, are not admissible.  The size of primitive types can
-    always be obtained using <literal>Storable.sizeOf</literal>. 
+    always be obtained using <literal>Storable.sizeOf</literal>.
     </para>
   </sect2>
 
@@ -421,8 +421,8 @@ gIntSize  = {#sizeof gint#}
   </sect2>
     <sect2>
 	    <title><literal>enum define</literal> hooks</title>
-      <para>Many C libraries do not use enum types, but macro definitions to implement constants.	          
-c2hs provides <literal>enum define</literal> hooks generate a haskell datatype from a collection of macro definitions.											
+      <para>Many C libraries do not use enum types, but macro definitions to implement constants.
+c2hs provides <literal>enum define</literal> hooks generate a haskell datatype from a collection of macro definitions.
        </para>
 
 <programlisting>
@@ -436,25 +436,25 @@ Create a haskell datatype <replaceable>hsid</replaceable>, with nullary construc
 <programlisting>
 #define X 0
 #define Y 1
-</programlisting>	
+</programlisting>
 <programlisting>
 {#enum define Axis {X as Axis0, Y as Axis1} deriving (Eq,Ord) #}
-</programlisting>	
-</para>        
+</programlisting>
+</para>
     </sect2>
 
   <sect2>
     <title>Call Hooks</title>
     <para>
 <programlisting>
-{#call [pure] [unsafe] <replaceable>cid</replaceable> [as (<replaceable>hsid</replaceable> | ^)]#}
+{#call [pure] [unsafe|interruptible] <replaceable>cid</replaceable> [as (<replaceable>hsid</replaceable> | ^)]#}
 </programlisting>
 
     A call hook rewrites to a call to the C function
     <replaceable>cid</replaceable> and also ensures that the appropriate foreign
     import declaration is generated.  The tags <literal>pure</literal> and
-    <literal>unsafe</literal> specify that the external function is purely
-    functional and cannot re-enter the Haskell runtime, respectively.  If
+    <literal>unsafe</literal>/<literal>interruptible</literal> specify that the external function is purely
+    functional and cannot re-enter the Haskell runtime/can be interrupted, respectively.  If
     <replaceable>hsid</replaceable> is present, it is used as the identifier for
     the foreign declaration, which otherwise defaults to the
     <replaceable>cid</replaceable>.  When instead of
@@ -477,7 +477,7 @@ sin  = {#call pure sin as "_sin"#}
     <title>Function Hooks</title>
     <para>
 <programlisting>
-{#fun  [pure] [unsafe] <replaceable>cid</replaceable> [as (<replaceable>hsid</replaceable> | ^)]
+{#fun  [pure] [unsafe|interruptible] <replaceable>cid</replaceable> [as (<replaceable>hsid</replaceable> | ^)]
 [<replaceable>ctxt</replaceable> =>] { <replaceable>parm1</replaceable> , ... , <replaceable>parmn</replaceable> } -> <replaceable>parm</replaceable>
 </programlisting>
 
@@ -538,7 +538,7 @@ sin  = {#call pure sin as "_sin"#}
     determined by the set of all marshalling specifications where the in
     marshaller is not followed by a minus sign.  Conversely, the result tuple of
     the Haskell function is determined by the set of all marshalling
-    specifications where the out marshaller is not followed by a minus sign. 
+    specifications where the out marshaller is not followed by a minus sign.
     The order of function arguments and components in the result tuple is the
     same as the order in which the marshalling specifications are given, with
     the exception that the value of the result marshaller is always the first
@@ -549,7 +549,7 @@ sin  = {#call pure sin as "_sin"#}
     <emphasis>default marshallers</emphasis> are provided by &C2hs; if no
     explicit marshaller is given.   The out marshaller for function arguments
     is by default <literal>void-</literal>. The defaults for the in marshallers
-    for function arguments are as follows: 
+    for function arguments are as follows:
 
     <itemizedlist>
       <listitem>
@@ -625,10 +625,10 @@ sin  = {#call pure sin as "_sin"#}
 
 <programlisting>
 {#fun notebook_query_tab_label_packing as ^
-  `(NotebookClass nb, WidgetClass cld)' => 
-  {notebook `nb'                , 
-   widget   `cld'               , 
-   alloca-  `Bool'     peekBool*, 
+  `(NotebookClass nb, WidgetClass cld)' =>
+  {notebook `nb'                ,
+   widget   `cld'               ,
+   alloca-  `Bool'     peekBool*,
    alloca-  `Bool'     peekBool*,
    alloca-  `PackType' peekEnum*} -> `()'#}
 </programlisting>
@@ -662,7 +662,7 @@ void gtk_notebook_query_tab_label_packing (GtkNotebook *notebook,
     A get hook supports accessing a member value of a C structure.  The hook
     itself yields a function that, when given the address of a structure of the
     right type, performs the structure access.  The member that is to be
-    extracted is specified by the access path <replaceable>apath</replaceable>. 
+    extracted is specified by the access path <replaceable>apath</replaceable>.
     Access paths are formed as follows (following a subset of the C expression
     syntax):
 
@@ -686,11 +686,11 @@ void gtk_notebook_query_tab_label_packing (GtkNotebook *notebook,
         An access path of the form
         <replaceable>apath</replaceable><literal>.</literal><replaceable>cid</replaceable>
         specifies that the value of the <literal>struct</literal> member called
-        <replaceable>cid</replaceable> should be accessed. 
+        <replaceable>cid</replaceable> should be accessed.
         </para>
       </listitem>
       <listitem>
-        <para>Finally, an access path of the form       
+        <para>Finally, an access path of the form
         <replaceable>apath</replaceable><literal>-></literal><replaceable>cid</replaceable>,
         as in C, specifies a combination of dereferencing and member selection.
         </para>
@@ -751,7 +751,7 @@ visualGetType (Visual vis)  = liftM cToEnum $ {#get Visual->type#} vis
     rather than a transparent type synonym.  In case of a
     <literal>newtype</literal>, the type argument to the Haskell pointer type
     will be <replaceable>hsid</replaceable>, which gives a cyclic definition,
-    but the type argument is here really only used as a unique type tag. 
+    but the type argument is here really only used as a unique type tag.
     Without <literal>newtype</literal>, the default type argument is
     <literal>()</literal>, but another type can be specified after the symbol
     <literal>-&gt;</literal>.
@@ -871,7 +871,7 @@ type PointPtr = Ptr Point
     for external pointers including up and down cast functionality.  This is
     meant to be used in cases where the objects referred to by the external
     pointers are order in such a hierachy in the external API - such structures
-    are encountered in C libraries that provide an object-oriented interface. 
+    are encountered in C libraries that provide an object-oriented interface.
     Each class hook rewrites to a class declaration and one or more instance
     declarations.
     </para>
@@ -942,14 +942,14 @@ type PointPtr = Ptr Point
     in a Haskell binding module by bracketing this C code with the pseudo
     directives <literal>#c</literal> and <literal>#endc</literal>.  Such inline
     C code is emitted into the C header generated by &C2hs; at exactly the same
-    position relative to CPP directives as it occurs in the binding module. 
+    position relative to CPP directives as it occurs in the binding module.
     Pre-processor directives may encompass the <literal>#include</literal>
     directive, which can be used instead of specifying a C header file as an
     argument to <literal>c2hs</literal>.  In particular, this enables the
     simultaneous use of multiple header files without the need to provide a
     custom header file that binds them together.  If a header file
     <replaceable>lib</replaceable><literal>.h</literal> is specified as an
-    argument to <literal>c2hs</literal>, the tool will emit the directive 
+    argument to <literal>c2hs</literal>, the tool will emit the directive
     <literal>#include"</literal><replaceable>lib</replaceable><literal>.h"</literal>
     into the generated C header before any other CPP directive or inline C code.
     </para>
@@ -1004,8 +1004,8 @@ inner    -> `import' ['qualified'] ident
           | `type' ident
           | `sizeof' ident
           | `enum' idalias trans [`with' prefix] [deriving]
-          | `call' [`pure'] [`unsafe'] idalias
-          | `fun' [`pure'] [`unsafe'] idalias parms
+          | `call' [`pure'] [`unsafe'|`interruptible'] idalias
+          | `fun' [`pure'] [`unsafe'|`interruptible'] idalias parms
           | `get' apath
           | `set' apath
           | `pointer' ['*'] idalias ptrkind
@@ -1044,7 +1044,7 @@ ptrkind  -> [`foreign' | `stable'] ['newtype' | '->' ident]
 
   <para>
   A good bug report contains information on the used operating system and
-  Haskell compiler as well as the version of &C2hs; that you have been using. 
+  Haskell compiler as well as the version of &C2hs; that you have been using.
   You can obtain the version information by running <literal>c2hs
   --version</literal>. If possible a concise example illustrating your problem
   would be appreciated.
@@ -1082,7 +1082,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
     <title>Documentation License</title>
     <para>
     <literallayout>
-This manual is Copyright (c) [2000..2005] by Manuel M. T. Chakravarty. 
+This manual is Copyright (c) [2000..2005] by Manuel M. T. Chakravarty.
 Permission is granted to copy, distribute and/or modify this document under
 the terms of the GNU Free Documentation License, Version 1.1 or any later
 version published by the Free Software Foundation; with no Invariant Sections,
@@ -1135,7 +1135,7 @@ license is included in the section entitled "GNU Free Documentation License".
         <para>
         Make c2hs integrate better with Cabal (1.2 and later)
         </para>
-      </listitem> 
+      </listitem>
       <listitem><para>Adapted to GHC 6.8.</para></listitem>
       <listitem><para>Now requires Cabal 1.2.</para></listitem>
       <listitem><para>Lots and lots of old code removal</para></listitem>
@@ -1192,7 +1192,7 @@ license is included in the section entitled "GNU Free Documentation License".
         <para>
         Hierarchical modules syntax in <literal>import</literal> hooks supported
         </para>
-      </listitem> 
+      </listitem>
       <listitem>
         <para>
         No separately installed marshaling library anymore; as a result binary
@@ -1304,10 +1304,10 @@ license is included in the section entitled "GNU Free Documentation License".
           This version of <literal>c2hs</literal> may
           <emphasis>overwrite</emphasis> C header files in the current
           directory. More precisely, if a binding module with the name
-          <literal>Foo.chs</literal> is processed, a header file with the name 
+          <literal>Foo.chs</literal> is processed, a header file with the name
           <literal>Foo.h</literal> is generated and will
           <emphasis>overwrite</emphasis> any file of the same name in the
-          current directory or the directory specified via the 
+          current directory or the directory specified via the
           <literal>-o</literal> option.
           </para>
         </warning>
@@ -1519,7 +1519,7 @@ license is included in the section entitled "GNU Free Documentation License".
           <para>This breaks source compatibility with previous versions.
           </para>
         </warning>
-      </listitem> 
+      </listitem>
     </itemizedlist>
   </sect2>
 

@@ -125,6 +125,7 @@ Executable c2hs
     hs-source-dirs: src
     main-is:        Main.hs
     other-modules:
+      C2HS.Types
       C2HS.C
       C2HS.C.Attrs
       C2HS.C.Builtin

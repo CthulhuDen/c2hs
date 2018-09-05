@@ -94,7 +94,7 @@
 --                   | `newtype' | `nocode' | `pointer' | `prefix' | `pure'
 --                   | `set' | `sizeof' | `stable' | `struct' | `type'
 --                   | `underscoreToCase' | `upcaseFirstLetter' | `unsafe' |
---                   | `with' | `const' | `omit'
+--                   | `interruptible` | `with' | `const' | `omit'
 --      reservedsym -> `{#' | `#}' | `{' | `}' | `,' | `.' | `->' | `='
 --                   | `=>' | '-' | `*' | `&' | `^' | `+' | `%'
 --      string      -> `"' instr* `"'
@@ -247,6 +247,7 @@ data CHSToken = CHSTokArrow   Position          -- `->'
               | CHSTokType    Position          -- `type'
               | CHSTok_2Case  Position          -- `underscoreToCase'
               | CHSTokUnsafe  Position          -- `unsafe'
+              | CHSTokIntrpt  Position          -- `interruptible'
               | CHSTokUpper   Position          -- `upcaseFirstLetter'
               | CHSTokVariadic Position          -- `variadic'
               | CHSTokWith    Position Ident    -- `with'
@@ -317,6 +318,7 @@ instance Pos CHSToken where
   posOf (CHSTokType    pos  ) = pos
   posOf (CHSTok_2Case  pos  ) = pos
   posOf (CHSTokUnsafe  pos  ) = pos
+  posOf (CHSTokIntrpt  pos  ) = pos
   posOf (CHSTokUpper   pos  ) = pos
   posOf (CHSTokVariadic pos  ) = pos
   posOf (CHSTokWith    pos _) = pos
@@ -388,6 +390,7 @@ instance Eq CHSToken where
   (CHSTokType     _  ) == (CHSTokType     _  ) = True
   (CHSTok_2Case   _  ) == (CHSTok_2Case   _  ) = True
   (CHSTokUnsafe   _  ) == (CHSTokUnsafe   _  ) = True
+  (CHSTokIntrpt   _  ) == (CHSTokIntrpt   _  ) = True
   (CHSTokUpper    _  ) == (CHSTokUpper    _  ) = True
   (CHSTokVariadic _  ) == (CHSTokVariadic _  ) = True
   (CHSTokWith     _ _) == (CHSTokWith     _ _) = True
@@ -463,6 +466,7 @@ instance Show CHSToken where
   showsPrec _ (CHSTokType    _  ) = showString "type"
   showsPrec _ (CHSTok_2Case  _  ) = showString "underscoreToCase"
   showsPrec _ (CHSTokUnsafe  _  ) = showString "unsafe"
+  showsPrec _ (CHSTokIntrpt  _  ) = showString "interruptible"
   showsPrec _ (CHSTokUpper   _  ) = showString "upcaseFirstLetter"
   showsPrec _ (CHSTokVariadic _  ) = showString "variadic"
   showsPrec _ (CHSTokWith    _ _) = showString "with"
@@ -841,6 +845,7 @@ identOrKW  =
     idkwtok pos "type"             _    = CHSTokType    pos
     idkwtok pos "underscoreToCase" _    = CHSTok_2Case  pos
     idkwtok pos "unsafe"           _    = CHSTokUnsafe  pos
+    idkwtok pos "interruptible"    _    = CHSTokIntrpt  pos
     idkwtok pos "upcaseFirstLetter"_    = CHSTokUpper   pos
     idkwtok pos "variadic"         _    = CHSTokVariadic pos
     idkwtok pos "with"             name = mkwith pos name
@@ -888,6 +893,7 @@ keywordToIdent tok =
     CHSTokType    pos -> mkid pos "type"
     CHSTok_2Case  pos -> mkid pos "underscoreToCase"
     CHSTokUnsafe  pos -> mkid pos "unsafe"
+    CHSTokIntrpt  pos -> mkid pos "interruptible"
     CHSTokUpper   pos -> mkid pos "upcaseFirstLetter"
     CHSTokVariadic pos -> mkid pos "variadic"
     CHSTokWith    pos ide -> CHSTokIdent pos ide
